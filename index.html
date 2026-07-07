@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>折扣港幣計算機</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4A90D9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="折扣計算">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -12,19 +16,20 @@
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     padding: 20px;
   }
   .card {
     background: #fff;
     border-radius: 16px;
-    padding: 32px;
-    max-width: 400px;
+    padding: 28px;
+    max-width: 420px;
     width: 100%;
     box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
   }
-  h1 { font-size: 1.4rem; margin-bottom: 24px; text-align: center; }
-  .field { margin-bottom: 16px; }
+  h1 { font-size: 1.4rem; margin-bottom: 20px; text-align: center; }
+  .field { margin-bottom: 14px; }
   label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 4px; }
   input {
     width: 100%;
@@ -35,8 +40,41 @@
     transition: border-color 0.2s;
   }
   input:focus { outline: none; border-color: #4A90D9; }
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .preset-btn {
+    padding: 6px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 20px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #555;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: #4A90D9; color: #4A90D9; }
+  .preset-btn.active { background: #4A90D9; color: #fff; border-color: #4A90D9; }
+  .fetch-btn {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    background: #4A90D9;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .fetch-btn:disabled { background: #aaa; cursor: wait; }
+  .fetch-btn.success { background: #4CAF50; }
+  .fetch-btn.error { background: #f44336; }
   .result {
-    margin-top: 24px;
+    margin-top: 20px;
     padding: 20px;
     background: #f0f7ff;
     border-radius: 12px;
@@ -45,66 +83,309 @@
   .result-label { font-size: 0.85rem; color: #666; margin-bottom: 4px; }
   .result-value { font-size: 2rem; font-weight: 700; color: #4A90D9; }
   .breakdown { font-size: 0.8rem; color: #999; margin-top: 8px; line-height: 1.6; }
+  .add-btn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    background: #4A90D9;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .add-btn:hover { background: #3a7bc8; }
+  .add-btn:disabled { background: #ccc; cursor: default; }
+  .list-section { display: none; }
+  .list-section.visible { display: block; }
+  .list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9rem;
+  }
+  .list-item-info { flex: 1; }
+  .list-item-hkd { font-weight: 600; color: #4A90D9; white-space: nowrap; }
+  .list-item-del {
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 0 0 8px;
+  }
+  .list-item-del:hover { color: #f44336; }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 14px;
+    margin-top: 8px;
+    border-top: 2px solid #e0e0e0;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .total-row .total-hkd { color: #4A90D9; }
+  .clear-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px;
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .clear-btn:hover { color: #f44336; }
 </style>
 </head>
 <body>
 <div class="card">
   <h1>🔧 折扣港幣計算機</h1>
+
+  <div class="presets" id="presets"></div>
+
   <div class="field">
     <label>當地貨幣價錢</label>
     <input type="number" id="price" placeholder="e.g. 1000" step="0.01" oninput="calc()">
   </div>
   <div class="field">
-    <label>匯率（1 當地貨幣 = ? 港幣）</label>
-    <input type="number" id="rate" placeholder="e.g. 0.95" step="0.0001" oninput="calc(); saveRate()">
+    <label>
+      匯率（1 當地貨幣 = ? 港幣）
+      <button class="fetch-btn" id="fetchBtn" onclick="fetchRate()">即時</button>
+    </label>
+    <input type="number" id="rate" placeholder="e.g. 0.05" step="0.0001" oninput="calc(); saveRate()">
   </div>
   <div class="field">
     <label>折扣（%）</label>
     <input type="number" id="discount" placeholder="e.g. 20 = 8折" step="1" oninput="calc()">
   </div>
+  <div class="field">
+    <label>消費稅（%）<span style="color:#bbb"> 可留空</span></label>
+    <input type="number" id="tax" placeholder="e.g. 日本 10%" step="0.5" oninput="calc()">
+  </div>
+
   <div class="result">
     <div class="result-label">折扣後港幣價錢</div>
     <div class="result-value" id="hkd">HK$ —</div>
     <div class="breakdown" id="detail"></div>
   </div>
+
+  <button class="add-btn" id="addBtn" disabled onclick="addItem()">+ 加入清單</button>
 </div>
+
+<div class="card list-section" id="listSection">
+  <h1 style="font-size:1.1rem">🛒 購物清單</h1>
+  <div id="itemList"></div>
+  <div class="total-row">
+    <span>總計</span>
+    <span class="total-hkd" id="totalHkd">HK$ 0.00</span>
+  </div>
+  <button class="clear-btn" onclick="clearList()">清除全部</button>
+</div>
+
 <script>
-// Load saved rate from cookie
+const PRESETS = [
+  { code: 'JPY', name: '日元', flag: '🇯🇵', rate: 0.052,  tax: 10 },
+  { code: 'KRW', name: '韓圜', flag: '🇰🇷', rate: 0.0056, tax: 0  },
+  { code: 'CNY', name: '人民幣', flag: '🇨🇳', rate: 1.08,  tax: 0  },
+  { code: 'TWD', name: '台幣', flag: '🇹🇼', rate: 0.24,  tax: 5  },
+  { code: 'USD', name: '美元', flag: '🇺🇸', rate: 7.8,   tax: 0  },
+  { code: 'EUR', name: '歐元', flag: '🇪🇺', rate: 8.5,   tax: 0  },
+  { code: 'GBP', name: '英鎊', flag: '🇬🇧', rate: 9.9,   tax: 0  },
+  { code: 'THB', name: '泰銖', flag: '🇹🇭', rate: 0.22,  tax: 7  },
+];
+
+let activePreset = null;
+let items = [];
+
+// --- Init presets ---
+const presetsEl = document.getElementById('presets');
+PRESETS.forEach(p => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.textContent = `${p.flag} ${p.code}`;
+  btn.onclick = () => selectPreset(p, btn);
+  presetsEl.appendChild(btn);
+});
+
+function selectPreset(p, btn) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activePreset = p;
+  document.getElementById('rate').value = p.rate;
+  document.getElementById('tax').value = p.tax || '';
+  saveRate();
+  calc();
+}
+
+// --- Load saved rate ---
 (function() {
   const match = document.cookie.match(/(?:^|; )calcRate=([^;]*)/);
   if (match) document.getElementById('rate').value = decodeURIComponent(match[1]);
+  const taxMatch = document.cookie.match(/(?:^|; )calcTax=([^;]*)/);
+  if (taxMatch) document.getElementById('tax').value = decodeURIComponent(taxMatch[1]);
 })();
 
 function saveRate() {
   const rate = document.getElementById('rate').value;
-  if (rate) {
-    const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
-    document.cookie = `calcRate=${encodeURIComponent(rate)}; expires=${expires}; path=/; SameSite=Strict`;
+  const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
+  if (rate) document.cookie = `calcRate=${encodeURIComponent(rate)}; expires=${expires}; path=/; SameSite=Strict`;
+}
+
+function saveTax() {
+  const tax = document.getElementById('tax').value;
+  const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
+  document.cookie = `calcTax=${encodeURIComponent(tax)}; expires=${expires}; path=/; SameSite=Strict`;
+}
+
+// --- Fetch live rate ---
+async function fetchRate() {
+  if (!activePreset) {
+    const btn = document.getElementById('fetchBtn');
+    btn.textContent = '先揀貨幣';
+    btn.classList.add('error');
+    setTimeout(() => { btn.textContent = '即時'; btn.classList.remove('error'); }, 1500);
+    return;
+  }
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = ' fetching...';
+  btn.classList.remove('success', 'error');
+  try {
+    const res = await fetch(`https://open.er-api.com/v6/latest/HKD`);
+    const data = await res.json();
+    const hkdToForeign = data.rates[activePreset.code];
+    if (!hkdToForeign) throw new Error('No rate');
+    const rate = 1 / hkdToForeign;
+    document.getElementById('rate').value = rate.toFixed(4);
+    saveRate();
+    btn.textContent = '✓ 已更新';
+    btn.classList.add('success');
+    calc();
+    setTimeout(() => { btn.textContent = '即時'; btn.classList.remove('success'); btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.textContent = '失敗';
+    btn.classList.add('error');
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = '即時'; btn.classList.remove('error'); }, 2000);
   }
 }
 
+// --- Calculate ---
 function calc() {
   const price = parseFloat(document.getElementById('price').value);
   const rate = parseFloat(document.getElementById('rate').value);
   const discount = parseFloat(document.getElementById('discount').value);
+  const tax = parseFloat(document.getElementById('tax').value);
 
   const elHkd = document.getElementById('hkd');
   const elDetail = document.getElementById('detail');
+  const addBtn = document.getElementById('addBtn');
 
-  if (isNaN(price) || isNaN(rate) || isNaN(discount)) {
+  saveTax();
+
+  if (isNaN(price) || isNaN(rate)) {
     elHkd.textContent = 'HK$ —';
     elDetail.textContent = '';
+    addBtn.disabled = true;
     return;
   }
 
-  const afterDiscount = price * (1 - discount / 100);
+  let afterTax = price;
+  let taxStr = '';
+  if (!isNaN(tax) && tax > 0) {
+    afterTax = price * (1 + tax / 100);
+    taxStr = ` × (1 + ${tax}% 稅) = ${afterTax.toFixed(2)}`;
+  }
+
+  let afterDiscount = afterTax;
+  let discountStr = '';
+  if (!isNaN(discount) && discount > 0) {
+    afterDiscount = afterTax * (1 - discount / 100);
+    discountStr = ` × (1 − ${discount}%) = ${afterDiscount.toFixed(2)}`;
+  }
+
+  const hkd = afterDiscount * rate;
+  elHkd.textContent = 'HK$ ' + hkd.toFixed(2);
+  addBtn.disabled = false;
+
+  const cur = activePreset ? activePreset.code : '當地';
+  elDetail.innerHTML =
+    `${price.toFixed(2)} ${cur}${taxStr}${discountStr}<br>` +
+    `= ${afterDiscount.toFixed(2)} ${cur} × ${rate}<br>` +
+    `= <strong>HK$ ${hkd.toFixed(2)}</strong>`;
+}
+
+// --- Shopping list ---
+function addItem() {
+  const price = parseFloat(document.getElementById('price').value);
+  const rate = parseFloat(document.getElementById('rate').value);
+  const discount = parseFloat(document.getElementById('discount').value);
+  const tax = parseFloat(document.getElementById('tax').value);
+
+  if (isNaN(price) || isNaN(rate)) return;
+
+  let afterTax = price;
+  if (!isNaN(tax) && tax > 0) afterTax = price * (1 + tax / 100);
+  let afterDiscount = afterTax;
+  if (!isNaN(discount) && discount > 0) afterDiscount = afterTax * (1 - discount / 100);
   const hkd = afterDiscount * rate;
 
-  elHkd.textContent = 'HK$ ' + hkd.toFixed(2);
-  elDetail.innerHTML =
-    `${price.toFixed(2)} × (1 − ${discount}%)<br>` +
-    `= ${afterDiscount.toFixed(2)} 當地貨幣<br>` +
-    `× ${rate} = <strong>HK$ ${hkd.toFixed(2)}</strong>`;
+  const cur = activePreset ? `${activePreset.flag}${activePreset.code}` : '';
+  items.push({
+    label: `${price} ${cur}${!isNaN(discount) && discount > 0 ? ' −' + discount + '%' : ''}${!isNaN(tax) && tax > 0 ? ' +' + tax + '%稅' : ''}`,
+    hkd: hkd
+  });
+  renderList();
+
+  // Clear price for next item
+  document.getElementById('price').value = '';
+  document.getElementById('price').focus();
+  calc();
+}
+
+function delItem(i) {
+  items.splice(i, 1);
+  renderList();
+}
+
+function clearList() {
+  items = [];
+  renderList();
+}
+
+function renderList() {
+  const section = document.getElementById('listSection');
+  const list = document.getElementById('itemList');
+  const totalEl = document.getElementById('totalHkd');
+
+  if (items.length === 0) {
+    section.classList.remove('visible');
+    return;
+  }
+  section.classList.add('visible');
+
+  list.innerHTML = items.map((item, i) =>
+    `<div class="list-item">
+       <span class="list-item-info">${item.label}</span>
+       <span class="list-item-hkd">HK$ ${item.hkd.toFixed(2)}</span>
+       <button class="list-item-del" onclick="delItem(${i})">×</button>
+     </div>`
+  ).join('');
+
+  const total = items.reduce((s, it) => s + it.hkd, 0);
+  totalEl.textContent = 'HK$ ' + total.toFixed(2);
+}
+
+// --- PWA ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>
