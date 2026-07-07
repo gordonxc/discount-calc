@@ -142,6 +142,20 @@
     cursor: pointer;
   }
   .clear-btn:hover { color: #f44336; }
+  .tax-row { margin-bottom: 14px; }
+  .tax-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tax-toggle input { width: auto; padding: 0; border: none; }
+  .tax-field { display: none; }
+  .tax-field.visible { display: block; }
 </style>
 </head>
 <body>
@@ -165,9 +179,15 @@
     <label>折扣（%）</label>
     <input type="number" id="discount" placeholder="e.g. 20 = 8折" step="1" oninput="calc()">
   </div>
-  <div class="field">
-    <label>消費稅（%）<span style="color:#bbb"> 可留空</span></label>
-    <input type="number" id="tax" placeholder="e.g. 日本 10%" step="0.5" oninput="calc()">
+  <div class="field tax-row">
+    <label class="tax-toggle">
+      <input type="checkbox" id="taxEnabled" checked onchange="toggleTax(); calc()">
+      輸入係稅前價（要加稅）
+    </label>
+    <div class="tax-field visible" id="taxField">
+      <label>消費稅（%）</label>
+      <input type="number" id="tax" placeholder="e.g. 日本 10%" step="0.5" oninput="calc()">
+    </div>
   </div>
 
   <div class="result">
@@ -222,6 +242,19 @@ function selectPreset(p, btn) {
   document.getElementById('tax').value = p.tax || '';
   saveRate();
   calc();
+}
+
+function toggleTax() {
+  const cb = document.getElementById('taxEnabled');
+  const field = document.getElementById('taxField');
+  const label = cb.parentElement;
+  if (cb.checked) {
+    field.classList.add('visible');
+    label.lastChild.textContent = ' 輸入係稅前價（要加稅）';
+  } else {
+    field.classList.remove('visible');
+    label.lastChild.textContent = ' 輸入係稅後價（唔使加稅）';
+  }
 }
 
 // --- Load saved rate ---
@@ -283,6 +316,7 @@ function calc() {
   const rate = parseFloat(document.getElementById('rate').value);
   const discount = parseFloat(document.getElementById('discount').value);
   const tax = parseFloat(document.getElementById('tax').value);
+  const taxEnabled = document.getElementById('taxEnabled').checked;
 
   const elHkd = document.getElementById('hkd');
   const elDetail = document.getElementById('detail');
@@ -299,7 +333,7 @@ function calc() {
 
   let afterTax = price;
   let taxStr = '';
-  if (!isNaN(tax) && tax > 0) {
+  if (taxEnabled && !isNaN(tax) && tax > 0) {
     afterTax = price * (1 + tax / 100);
     taxStr = ` × (1 + ${tax}% 稅) = ${afterTax.toFixed(2)}`;
   }
@@ -328,18 +362,19 @@ function addItem() {
   const rate = parseFloat(document.getElementById('rate').value);
   const discount = parseFloat(document.getElementById('discount').value);
   const tax = parseFloat(document.getElementById('tax').value);
+  const taxEnabled = document.getElementById('taxEnabled').checked;
 
   if (isNaN(price) || isNaN(rate)) return;
 
   let afterTax = price;
-  if (!isNaN(tax) && tax > 0) afterTax = price * (1 + tax / 100);
+  if (taxEnabled && !isNaN(tax) && tax > 0) afterTax = price * (1 + tax / 100);
   let afterDiscount = afterTax;
   if (!isNaN(discount) && discount > 0) afterDiscount = afterTax * (1 - discount / 100);
   const hkd = afterDiscount * rate;
 
   const cur = activePreset ? `${activePreset.flag}${activePreset.code}` : '';
   items.push({
-    label: `${price} ${cur}${!isNaN(discount) && discount > 0 ? ' −' + discount + '%' : ''}${!isNaN(tax) && tax > 0 ? ' +' + tax + '%稅' : ''}`,
+    label: `${price} ${cur}${!isNaN(discount) && discount > 0 ? ' −' + discount + '%' : ''}${taxEnabled && !isNaN(tax) && tax > 0 ? ' +' + tax + '%稅' : ''}`,
     hkd: hkd
   });
   renderList();
